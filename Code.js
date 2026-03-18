@@ -13,6 +13,7 @@ function moveFilesByAnimal() {
     "blackcap": "10rmyt9yvj_dTg8vbYas364Mic6y6iVus",
     "bird of prey": "11jLxiKHddK0F4a1YUQfAMfLMZOeLEfI3",
     "bird to ID": "1CoB1Swy1AkfV3JjSdScA8PXrn1e_1Kls",
+    "boar": "1htup-ETopOq3yJzGQ_b6eRFKUbG6-m9M",
     "bullfinch": "10rmyt9yvj_dTg8vbYas364Mic6y6iVus",
     "buzzard": "11jLxiKHddK0F4a1YUQfAMfLMZOeLEfI3",
     "cat": "1qRpIC6k9vglMZ3RbO16yOxDbFX9a8cYc",
