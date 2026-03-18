@@ -1,14 +1,14 @@
 function moveFilesByAnimal() {
   const SOURCE_FOLDER_ID = "1U30kiozuwPLEx_edKO79hu4JKZKCQgPj"; // Replace with actual source folder ID
   const DESTINATION_FOLDER_ID = "1xRHsXFHepDyMouaIweregq5Fj8oC9Mm1"; // Replace with actual destination folder ID
-  const LOG_SHEET_ID = "10gmO3pgR0vC-8UPikLus9L6-hLHxsc63Ali3HA8qcRE"; // Google Sheet for logging moves
+  const LOG_SHEET_ID = "1zAxyKpRPALKzw1Ufz0Yuw9fUlO8QVdxmjIY5qz0kBRc"; // Google Sheet for logging moves
  
   // Define mapping of animal names to their respective destination folder IDs
   const animalFolderMap = {
     "alex": "1ac748zdPNsSC_2Nqch6-cWiyPMQ_vDmN",
     "badger": "1Wk4ixK_IoxXv-gzDiE6oBsLIDn82mkr1",
     "bat": "1-pSaAkL2kOflPU1EVmb6vnwkjhFklJgp",
-    "beaver": "1HLvtjdrzaJJ5pQOACEAKxVzQRIwOWSBE",
+    "beaver": "1EqCb-J65HAghIjEaqlL8kgPXhRb2mpz-",
     "blackbird": "1EhcUuztPJARdku0YuNtN5BpochhjU_OS",
     "blackcap": "10rmyt9yvj_dTg8vbYas364Mic6y6iVus",
     "bird of prey": "11jLxiKHddK0F4a1YUQfAMfLMZOeLEfI3",
