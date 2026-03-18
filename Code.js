@@ -103,7 +103,7 @@ function moveFilesByAnimal() {
     "wren": "10rmyt9yvj_dTg8vbYas364Mic6y6iVus"
   };
  
-  // Folders that use camera + year + month structure (Species → Camera Year → Camera Month-Year → Files)
+  // Folders that use camera + year + month structure (Species → Year → Camera Year → Camera Month-Year → Files)
   const CAMERA_MONTH_YEAR_FOLDERS = new Set([
     "1EqCb-J65HAghIjEaqlL8kgPXhRb2mpz-"  // Beaver
   ]);
@@ -134,28 +134,34 @@ function moveFilesByAnimal() {
     const sourceFolder = DriveApp.getFolderById(SOURCE_FOLDER_ID);
     const destinationFolder = DriveApp.getFolderById(DESTINATION_FOLDER_ID);
     
-    // Initialize the log sheet and ensure headers exist
-    const logSheet = initializeLogSheet(LOG_SHEET_ID);
+    // Initialize the log sheets and ensure headers exist
+    const spreadsheet = SpreadsheetApp.openById(LOG_SHEET_ID);
+    const fileMoveSheet = initializeFileMoveLogSheet(spreadsheet);
+    const folderDeletionSheet = initializeFolderDeletionLogSheet(spreadsheet);
    
     Logger.log("Scanning source folder...");
     const stats = { processed: 0, moved: 0, skipped: 0, errors: 0 };
-    scanSubfolders(sourceFolder, animalRegexMap, CAMERA_MONTH_YEAR_FOLDERS, YEAR_CAMERA_FOLDERS, folderCache, pathCache, logSheet, stats);
+    scanSubfolders(sourceFolder, animalRegexMap, CAMERA_MONTH_YEAR_FOLDERS, YEAR_CAMERA_FOLDERS, folderCache, pathCache, fileMoveSheet, stats);
     
     Logger.log("Cleaning up empty folders...");
-    const deletedCount = deleteEmptyFolders(sourceFolder);
-    Logger.log(`Deleted ${deletedCount} empty folders.`);
+    const deletedFolders = deleteEmptyFolders(sourceFolder, pathCache, folderDeletionSheet);
+    Logger.log(`Deleted ${deletedFolders.length} empty folders.`);
     
     Logger.log("File processing complete.");
-    Logger.log(`Summary: ${stats.processed} files processed, ${stats.moved} moved, ${stats.skipped} skipped, ${stats.errors} errors, ${deletedCount} empty folders deleted`);
+    Logger.log(`Summary: ${stats.processed} files processed, ${stats.moved} moved, ${stats.skipped} skipped, ${stats.errors} errors, ${deletedFolders.length} empty folders deleted`);
   } catch (error) {
     Logger.log(`Error: ${error.message}`);
   }
 }
 
-// Initialize the log sheet and add headers if needed
-function initializeLogSheet(sheetId) {
-  const spreadsheet = SpreadsheetApp.openById(sheetId);
-  let sheet = spreadsheet.getActiveSheet();
+// Initialize the file move log sheet and add headers if needed
+function initializeFileMoveLogSheet(spreadsheet) {
+  let sheet = spreadsheet.getSheetByName("File Moves");
+  
+  // Create sheet if it doesn't exist
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet("File Moves");
+  }
   
   // Check if headers exist, if not create them
   if (sheet.getLastRow() === 0) {
@@ -188,8 +194,38 @@ function initializeLogSheet(sheetId) {
   return sheet;
 }
 
+// Initialize the folder deletion log sheet and add headers if needed
+function initializeFolderDeletionLogSheet(spreadsheet) {
+  let sheet = spreadsheet.getSheetByName("Folder Deletions");
+  
+  // Create sheet if it doesn't exist
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet("Folder Deletions");
+  }
+  
+  // Check if headers exist, if not create them
+  if (sheet.getLastRow() === 0) {
+    const headers = [
+      "Timestamp",
+      "Folder Name",
+      "Folder Path",
+      "Deletion Status",
+      "Error Message"
+    ];
+    sheet.appendRow(headers);
+    
+    // Format header row
+    const headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setFontWeight("bold");
+    headerRange.setBackground("#4285F4");
+    headerRange.setFontColor("#FFFFFF");
+  }
+  
+  return sheet;
+}
+
 // Log a file move operation to the Google Sheet
-function logToSheet(sheet, logData) {
+function logFileMove(sheet, logData) {
   const row = [
     logData.timestamp,
     logData.filename,
@@ -206,6 +242,19 @@ function logToSheet(sheet, logData) {
     logData.moveStatus,
     logData.errorMessage,
     logData.processingTime
+  ];
+  
+  sheet.appendRow(row);
+}
+
+// Log a folder deletion to the Google Sheet
+function logFolderDeletion(sheet, folderName, folderPath, status, errorMessage) {
+  const row = [
+    new Date(),
+    folderName,
+    folderPath,
+    status,
+    errorMessage || ""
   ];
   
   sheet.appendRow(row);
@@ -316,7 +365,7 @@ function processFiles(folder, animalRegexMap, cameraMonthYearFolders, yearCamera
       logData.moveStatus = "Skipped";
       logData.errorMessage = "Not a video file";
       logData.processingTime = new Date().getTime() - startTime;
-      logToSheet(logSheet, logData);
+      logFileMove(logSheet, logData);
       Logger.log(`Skipped: ${fileName} (Not a video file)`);
       continue;
     }
@@ -328,7 +377,7 @@ function processFiles(folder, animalRegexMap, cameraMonthYearFolders, yearCamera
       logData.moveStatus = "Skipped";
       logData.errorMessage = "No matching animal found";
       logData.processingTime = new Date().getTime() - startTime;
-      logToSheet(logSheet, logData);
+      logFileMove(logSheet, logData);
       Logger.log(`Skipped: ${fileName} (No matching animal found)`);
       continue;
     }
@@ -385,7 +434,7 @@ function processFiles(folder, animalRegexMap, cameraMonthYearFolders, yearCamera
     }
     
     logData.processingTime = new Date().getTime() - startTime;
-    logToSheet(logSheet, logData);
+    logFileMove(logSheet, logData);
   }
 }
 
@@ -558,9 +607,9 @@ function moveFileToFolder(file, targetFolderId, folderCache) {
   Logger.log(`Moved file: ${file.getName()} → ${targetFolder.getName()}`);
 }
 
-// Recursively delete empty folders within a parent folder
-function deleteEmptyFolders(parentFolder) {
-  let deletedCount = 0;
+// Recursively delete empty folders within a parent folder and log to sheet
+function deleteEmptyFolders(parentFolder, pathCache, logSheet) {
+  const deletedFolders = [];
   const ignoreKeywords = ["don't move", "ignore"];
   const subfolders = parentFolder.getFolders();
   
@@ -577,21 +626,25 @@ function deleteEmptyFolders(parentFolder) {
     }
     
     // First, recursively delete empty subfolders within this folder
-    deletedCount += deleteEmptyFolders(folder);
+    const childDeletions = deleteEmptyFolders(folder, pathCache, logSheet);
+    deletedFolders.push(...childDeletions);
     
     // After processing subfolders, check if this folder is now empty
     if (isFolderEmpty(folder)) {
+      const folderPath = getFolderPath(folder, pathCache);
       try {
         folder.setTrashed(true);
         Logger.log(`Deleted empty folder: ${folderName}`);
-        deletedCount++;
+        logFolderDeletion(logSheet, folderName, folderPath, "Success", null);
+        deletedFolders.push(folderName);
       } catch (error) {
         Logger.log(`Error deleting folder ${folderName}: ${error.message}`);
+        logFolderDeletion(logSheet, folderName, folderPath, "Error", error.message);
       }
     }
   }
   
-  return deletedCount;
+  return deletedFolders;
 }
 
 // Check if a folder is completely empty (no files and no subfolders)
